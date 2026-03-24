@@ -1,0 +1,46 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4e8b2a1793c4d5e6f708192a3b4c5d6, type: 3}
+  m_Name: GameConfig
+  m_EditorClassIdentifier: Assembly-CSharp::Swarm.GameConfig
+  organismCount: 200
+  spawnCircleCenter: {x: 0, y: 0}
+  spawnCircleRadius: 4
+  organismSpeedMin: 2
+  organismSpeedMax: 3
+  neighborRadius: 1.5
+  angularNoiseDegrees: 12
+  vicsekMaxNeighbors: 32
+  vicsekStagger: 1
+  vicsekSpatialSubdivisions: 2
+  vicsekMaxBucketSamples: 64
+  boundingDomainRadius: 100
+  boundingRepulsionBandWidth: 15
+  spatialGridBucketCapacity: 16
+  triangleScale: 0.35
+  triangleSpriteResolution: 32
+  organismColorAtMinSpeed: {r: 0.25, g: 0.55, b: 1, a: 1}
+  organismColorAtMaxSpeed: {r: 1, g: 0.4, b: 0.15, a: 1}
+  organismMass: 1
+  cameraKeyboardPanSpeed: 10
+  cameraMousePanButtons: 0100000002000000
+  cameraMousePanSensitivity: 1
+  cameraScrollZoomSpeed: 0.65
+  cameraKeyboardZoomSpeed: 4
+  cameraMinOrthographicSize: 1.5
+  cameraMaxOrthographicSize: 48
+  checkerCellWorldSize: 1
+  checkerColorA: {r: 0.14, g: 0.15, b: 0.18, a: 1}
+  checkerColorB: {r: 0.1, g: 0.11, b: 0.14, a: 1}
+  checkerBackgroundHalfExtent: 320
+  checkerboardSortingOrder: -500
+  checkerboardZOffset: 0.02

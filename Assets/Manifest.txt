@@ -1,0 +1,15 @@
+This is the manifest for Swarm, a 2D video game programmed in Unity 6.3 LTS that simulates a swarm of organisms that could be birds, bugs, or fish.
+
+
+When the game is started the player starts on a menu screen. The menu screen is plain with two buttons, one that says "Start Game" and one that says "Exit Game". When the "Exit Game" button is pressed the game closes. When the "Start Game" button is pressed the game transitions to the game scene.
+
+Game scene - The game scene uses a game object called an organism factor to generate organism objects. At the start of the game scene 20 organisms are spawned uniformly within a circle.
+
+Organism - An organism is a 2D game object that moves in 2D space. The object is represented as a triangle with the point of the triangle pointing in the direction that the organism is moving. The organisms position and moving direction are randomly chosen, but the movement pattern afterwards follows the Vicsek model.
+
+Vicsek model - The vicsek model is a mathematical model of swarm movement. Each organism in the game Swarm should follow the Vicsek model for movement.
+
+Camera - The game scene should be controllable with standard camera movements for pan and zoom using the mouse or keyboard.
+
+Organization - All constants used in the game (such as acceleration rates, mass, positions, and sizes) are stored in a GameConfig script and other scripts load their constants from GameConfig.
+All keyboard keys are defined in a KeyboardConfig file which specifies which key performs which action in the game.
