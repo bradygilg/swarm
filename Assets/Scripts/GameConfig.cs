@@ -7,15 +7,53 @@ namespace Swarm
     public sealed class GameConfig : ScriptableObject
     {
         [Header("Spawn")]
-        [Min(1)] public int organismCount = 1000;
+        [Min(1)] public int organismCount = 2000;
         public Vector2 spawnCircleCenter = Vector2.zero;
         [Min(0.01f)] public float spawnCircleRadius = 5f;
 
         [Header("Organism motion")]
         [Tooltip("Each organism picks a cruise speed in [min, max] at spawn (inclusive).")]
-        [Min(0.01f)] public float organismSpeedMin = 1f;
+        [Min(0.01f)] public float organismSpeedMin = 0.5f;
 
-        [Min(0.01f)] public float organismSpeedMax = 4f;
+        [Min(0.01f)] public float organismSpeedMax = 2f;
+
+        [Tooltip("Fraction of spawns that use SquareOrganism (anti-alignment).")]
+        [Range(0f, 1f)] public float spawnFractionSquare = 0.05f;
+
+        [Tooltip("Fraction of spawns that use CircleOrganism (density-based speed).")]
+        [Range(0f, 1f)] public float spawnFractionCircle = 0.05f;
+
+        [Tooltip("Fraction of spawns that use StarOrganism (others flee its position in Vicsek mean).")]
+        [Range(0f, 1f)] public float spawnFractionStar = 0.01f;
+
+        [Tooltip("Fraction of spawns that receive a Predator component; remainder receive Prey.")]
+        [Range(0f, 1f)] public float spawnFractionPredator = 0.01f;
+
+        [Header("Predator / Prey")]
+        [Tooltip("Seconds between eat attempts (X).")]
+        [Min(1e-4f)] public float predatorEatIntervalSeconds = 5f;
+
+        [Tooltip("World radius to find prey (Y).")]
+        [Min(1e-4f)] public float predatorHuntRadius = 1f;
+
+        [Tooltip("Scale multiplier increase per eat as percent (Z), e.g. 10 = +10% size.")]
+        public float predatorGrowthPercentOnEat = 10f;
+
+        [Tooltip("Seconds to fade prey sprite alpha to zero before destroy.")]
+        [Min(0.01f)] public float preyFadeDurationSeconds = 1f;
+
+        [Tooltip("Seconds between independent replication rolls for each Prey.")]
+        [Min(0.1f)] public float preyReplicateIntervalSeconds = 10f;
+
+        [Tooltip("Chance (0–1) each interval that a Prey spawns one duplicate of itself.")]
+        [Range(0f, 1f)] public float preyReplicateChance = 0.2f;
+
+        [Header("Circle organism")]
+        [Tooltip("Cruise speed when few neighbors are in the Vicsek K-set (fill → 0).")]
+        [Min(0.01f)] public float circleCruiseSpeedLowDensity = 1f;
+
+        [Tooltip("Cruise speed when the K-set is full (fill → vicsekMaxNeighbors).")]
+        [Min(0.01f)] public float circleCruiseSpeedHighDensity = 3.5f;
 
         [Header("Vicsek")]
         [Min(0.01f)] public float neighborRadius = 1.5f;
@@ -26,7 +64,7 @@ namespace Swarm
         [Min(1)] public int vicsekMaxNeighbors = 10;
 
         [Tooltip("1 = every physics step; 2 = half the agents update Vicsek per step (others keep prior heading).")]
-        [Min(1)] public int vicsekStagger = 1;
+        [Min(1)] public int vicsekStagger = 3;
 
         [Tooltip("Grid cell size = neighborRadius / subdivisions. Higher splits dense clusters across more buckets (wider cell query range).")]
         [Min(1)] public int vicsekSpatialSubdivisions = 2;
@@ -90,5 +128,14 @@ namespace Swarm
 
         [Tooltip("Slight Z offset for 2D ordering.")]
         public float checkerboardZOffset = 0.02f;
+
+        void OnValidate()
+        {
+            if (spawnFractionSquare + spawnFractionCircle > 1f)
+                spawnFractionCircle = Mathf.Max(0f, 1f - spawnFractionSquare);
+            float maxStar = Mathf.Max(0f, 1f - spawnFractionSquare - spawnFractionCircle);
+            if (spawnFractionStar > maxStar)
+                spawnFractionStar = maxStar;
+        }
     }
 }

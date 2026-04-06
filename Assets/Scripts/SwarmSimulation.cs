@@ -5,12 +5,8 @@ using UnityEngine;
 namespace Swarm
 {
     /// <summary>
-    /// Single batched Vicsek + boundary step for all organisms. Replaces per-<see cref="Organism"/> <see cref="FixedUpdate"/>.
+    /// Shared spatial grid; each <see cref="Organism"/> owns simulation position, velocity, and cruise speed.
     /// </summary>
-    /// <remarks>
-    /// Optional next steps for very large counts: Unity Jobs + Burst over NativeArrays / NativeParallelMultiHashMap;
-    /// rendering: Graphics.DrawMeshInstanced to replace many SpriteRenderers.
-    /// </remarks>
     [DefaultExecutionOrder(-100)]
     [DisallowMultipleComponent]
     public sealed class SwarmSimulation : MonoBehaviour
@@ -18,7 +14,7 @@ namespace Swarm
         const string DefaultConfigResource = "GameConfig";
 
         static readonly ProfilerMarker s_ProfileRebuildGrid = new ProfilerMarker("Swarm.RebuildGrid");
-        static readonly ProfilerMarker s_ProfileVicsek = new ProfilerMarker("Swarm.Vicsek");
+        static readonly ProfilerMarker s_ProfileVicsek = new ProfilerMarker("Swarm.NeighborSteering");
         static readonly ProfilerMarker s_ProfileDynamics = new ProfilerMarker("Swarm.BoundaryIntegrateClamp");
         static readonly ProfilerMarker s_ProfileTransforms = new ProfilerMarker("Swarm.ApplyTransforms");
 
@@ -26,15 +22,13 @@ namespace Swarm
 
         [SerializeField] GameConfig gameConfig;
 
+        public GameConfig Config => gameConfig;
+
         readonly List<Organism> _organisms = new List<Organism>();
-        readonly List<Vector2> _positions = new List<Vector2>();
-        readonly List<Vector2> _velocities = new List<Vector2>();
-        readonly List<float> _cruiseSpeeds = new List<float>();
 
-        readonly Dictionary<(int cx, int cy), List<int>> _spatialGrid =
-            new Dictionary<(int cx, int cy), List<int>>();
+        readonly Dictionary<(int cx, int cy), List<Organism>> _spatialGrid =
+            new Dictionary<(int cx, int cy), List<Organism>>();
 
-        /// <summary>Reused for Vicsek K-nearest selection (no List grow / Sort per agent).</summary>
         Candidate[] _kBestBuffer;
 
         int _physicsStepCounter;
@@ -42,7 +36,7 @@ namespace Swarm
         struct Candidate
         {
             public float DistSq;
-            public int Index;
+            public Organism Neighbor;
         }
 
         void Awake()
@@ -63,15 +57,137 @@ namespace Swarm
                 Instance = null;
         }
 
-        /// <summary>Register an organism after <see cref="Organism.Initialize"/> sets up visuals. Call from main thread only.</summary>
-        public int RegisterAgent(Organism organism, Vector2 position, Vector2 velocity, float cruiseSpeed)
+        public void RegisterAgent(Organism organism)
         {
-            int id = _organisms.Count;
+            if (organism == null)
+                return;
             _organisms.Add(organism);
-            _positions.Add(position);
-            _velocities.Add(velocity);
-            _cruiseSpeeds.Add(Mathf.Max(1e-4f, cruiseSpeed));
-            return id;
+        }
+
+        public void UnregisterAgent(Organism organism)
+        {
+            if (organism == null)
+                return;
+            _organisms.Remove(organism);
+        }
+
+        /// <summary>Registered <see cref="Organism"/> instances (non-destroyed); matches how many exist in the simulation.</summary>
+        public int LiveOrganismCount
+        {
+            get
+            {
+                GetLiveOrganismCounts(out int total, out _, out _);
+                return total;
+            }
+        }
+
+        /// <summary>Single pass over registered agents: total organisms, and how many have <see cref="Predator"/> / <see cref="Prey"/> (an agent may contribute to both).</summary>
+        public void GetLiveOrganismCounts(out int total, out int predatorCount, out int preyCount)
+        {
+            total = 0;
+            predatorCount = 0;
+            preyCount = 0;
+            int n = _organisms.Count;
+            for (int i = 0; i < n; i++)
+            {
+                Organism o = _organisms[i];
+                if (o == null)
+                    continue;
+
+                total++;
+                if (o.GetComponent<Predator>() != null)
+                    predatorCount++;
+                if (o.GetComponent<Prey>() != null)
+                    preyCount++;
+            }
+        }
+
+        /// <summary>All organisms within <paramref name="radius"/> of <paramref name="position"/> (active only), using current simulation positions.</summary>
+        public void CollectOrganismsWithinRadius(Vector2 position, float radius, List<Organism> buffer)
+        {
+            if (buffer == null)
+                return;
+
+            buffer.Clear();
+            float r2 = radius * radius;
+            int n = _organisms.Count;
+            for (int i = 0; i < n; i++)
+            {
+                Organism org = _organisms[i];
+                if (org == null || !org.IsActiveInSimulation)
+                    continue;
+
+                Vector2 d = org.SimulationPosition - position;
+                if (d.sqrMagnitude <= r2)
+                    buffer.Add(org);
+            }
+        }
+
+        /// <summary>Valid until the next <see cref="GatherKNearestNeighbors"/> on this instance.</summary>
+        public Organism GetGatheredNeighbor(int slot) => _kBestBuffer[slot].Neighbor;
+
+        /// <summary>Fills the internal K-best buffer; neighbors are <see cref="GetGatheredNeighbor"/> for slots <c>[0, return)</c>.</summary>
+        public int GatherKNearestNeighbors(Organism self, float cellSize, float neighborRadius, float r2, int maxK)
+        {
+            if (self == null || gameConfig == null)
+                return 0;
+
+            EnsureKBestCapacity(maxK);
+
+            Vector2 p = self.SimulationPosition;
+            int cx = Mathf.FloorToInt(p.x / cellSize);
+            int cy = Mathf.FloorToInt(p.y / cellSize);
+
+            int range = Mathf.Max(1, Mathf.CeilToInt(neighborRadius / cellSize));
+            int maxBucketSamples = gameConfig.vicsekMaxBucketSamples;
+
+            int fill = 0;
+            Candidate[] buf = _kBestBuffer;
+
+            for (int ox = -range; ox <= range; ox++)
+            {
+                for (int oy = -range; oy <= range; oy++)
+                {
+                    if (!_spatialGrid.TryGetValue((cx + ox, cy + oy), out List<Organism> bucket))
+                        continue;
+
+                    int cnt = bucket.Count;
+                    int stride = 1;
+                    if (maxBucketSamples > 0 && cnt > maxBucketSamples)
+                        stride = (cnt + maxBucketSamples - 1) / maxBucketSamples;
+
+                    for (int b = 0; b < cnt; b += stride)
+                    {
+                        Organism neighbor = bucket[b];
+                        if (!neighbor.IsActiveInSimulation)
+                            continue;
+                        if (!self.IncludeNeighborInGather(neighbor))
+                            continue;
+
+                        Vector2 d = neighbor.SimulationPosition - p;
+                        float dsq = d.sqrMagnitude;
+                        if (dsq > r2)
+                            continue;
+
+                        Vector2 vj = neighbor.SimulationVelocity;
+                        if (vj.sqrMagnitude < 1e-8f)
+                            continue;
+
+                        if (fill < maxK)
+                        {
+                            buf[fill++] = new Candidate { DistSq = dsq, Neighbor = neighbor };
+                        }
+                        else
+                        {
+                            int w = IndexOfLargestDistSq(buf, maxK);
+                            if (dsq < buf[w].DistSq)
+                                buf[w] = new Candidate { DistSq = dsq, Neighbor = neighbor };
+                        }
+                    }
+                }
+            }
+
+            return fill;
         }
 
         void FixedUpdate()
@@ -91,8 +207,6 @@ namespace Swarm
             int stagger = Mathf.Max(1, gameConfig.vicsekStagger);
             int step = _physicsStepCounter++;
 
-            // Pass order + ProfilerMarkers: Vicsek reads positions from this frame’s grid (symmetric);
-            // then boundary / integration / clamp; then transform writes (clear CPU breakdown in Profiler).
             using (s_ProfileRebuildGrid.Auto())
                 RebuildSpatialGrid(cellSize, n);
 
@@ -100,12 +214,13 @@ namespace Swarm
             {
                 for (int i = 0; i < n; i++)
                 {
-                    if (_organisms[i] == null)
+                    Organism org = _organisms[i];
+                    if (org == null || !org.IsActiveInSimulation)
                         continue;
 
-                    bool runVicsek = (i % stagger) == (step % stagger);
-                    if (runVicsek)
-                        StepVicsekForAgent(i, cellSize, r, r2, maxK);
+                    bool runSteering = (i % stagger) == (step % stagger);
+                    if (runSteering)
+                        org.RunNeighborSteering(this, cellSize, r, r2, maxK);
                 }
             }
 
@@ -113,12 +228,13 @@ namespace Swarm
             {
                 for (int i = 0; i < n; i++)
                 {
-                    if (_organisms[i] == null)
+                    Organism org = _organisms[i];
+                    if (org == null || !org.IsActiveInSimulation)
                         continue;
 
-                    ApplyBoundarySteering(i);
-                    _positions[i] += _velocities[i] * dt;
-                    ClampAgentPosition(i);
+                    org.ApplyBoundarySteering(gameConfig);
+                    org.IntegrateSimulationPosition(dt);
+                    org.ClampSimulationPosition(gameConfig);
                 }
             }
 
@@ -126,15 +242,11 @@ namespace Swarm
             {
                 for (int i = 0; i < n; i++)
                 {
-                    if (_organisms[i] == null)
+                    Organism org = _organisms[i];
+                    if (org == null || !org.IsActiveInSimulation)
                         continue;
 
-                    Transform t = _organisms[i].transform;
-                    Vector2 p = _positions[i];
-                    Vector2 v = _velocities[i];
-                    t.position = new Vector3(p.x, p.y, t.position.z);
-                    float angle = Mathf.Atan2(v.y, v.x) * Mathf.Rad2Deg;
-                    t.rotation = Quaternion.Euler(0f, 0f, angle);
+                    org.SyncTransformFromSimulation();
                 }
             }
         }
@@ -143,25 +255,26 @@ namespace Swarm
         {
             int bucketCap = Mathf.Max(1, gameConfig.spatialGridBucketCapacity);
 
-            foreach (List<int> bucket in _spatialGrid.Values)
+            foreach (List<Organism> bucket in _spatialGrid.Values)
                 bucket.Clear();
 
             for (int i = 0; i < n; i++)
             {
-                if (_organisms[i] == null)
+                Organism org = _organisms[i];
+                if (org == null || !org.IsActiveInSimulation)
                     continue;
 
-                Vector2 pos = _positions[i];
+                Vector2 pos = org.SimulationPosition;
                 int cx = Mathf.FloorToInt(pos.x / cellSize);
                 int cy = Mathf.FloorToInt(pos.y / cellSize);
                 var key = (cx, cy);
-                if (!_spatialGrid.TryGetValue(key, out List<int> list))
+                if (!_spatialGrid.TryGetValue(key, out List<Organism> list))
                 {
-                    list = new List<int>(bucketCap);
+                    list = new List<Organism>(bucketCap);
                     _spatialGrid[key] = list;
                 }
 
-                list.Add(i);
+                list.Add(org);
             }
         }
 
@@ -169,16 +282,6 @@ namespace Swarm
         {
             if (_kBestBuffer == null || _kBestBuffer.Length < maxK)
                 _kBestBuffer = new Candidate[maxK];
-        }
-
-        /// <summary>Standard normal N(0,1) via Box–Muller (uses two uniform samples).</summary>
-        static float SampleGaussianStandard()
-        {
-            float u1 = 1f - Random.value;
-            if (u1 < 1e-7f)
-                u1 = 1e-7f;
-            float u2 = Random.value;
-            return Mathf.Sqrt(-2f * Mathf.Log(u1)) * Mathf.Cos(2f * Mathf.PI * u2);
         }
 
         static int IndexOfLargestDistSq(Candidate[] buf, int count)
@@ -191,118 +294,6 @@ namespace Swarm
             }
 
             return w;
-        }
-
-        void StepVicsekForAgent(int agentIndex, float cellSize, float neighborRadius, float r2, int maxK)
-        {
-            EnsureKBestCapacity(maxK);
-
-            Vector2 p = _positions[agentIndex];
-            int cx = Mathf.FloorToInt(p.x / cellSize);
-            int cy = Mathf.FloorToInt(p.y / cellSize);
-
-            int range = Mathf.Max(1, Mathf.CeilToInt(neighborRadius / cellSize));
-            int maxBucketSamples = gameConfig.vicsekMaxBucketSamples;
-
-            int fill = 0;
-            Candidate[] buf = _kBestBuffer;
-
-            for (int ox = -range; ox <= range; ox++)
-            {
-                for (int oy = -range; oy <= range; oy++)
-                {
-                    if (!_spatialGrid.TryGetValue((cx + ox, cy + oy), out List<int> bucket))
-                        continue;
-
-                    int cnt = bucket.Count;
-                    int stride = 1;
-                    if (maxBucketSamples > 0 && cnt > maxBucketSamples)
-                        stride = (cnt + maxBucketSamples - 1) / maxBucketSamples;
-
-                    for (int b = 0; b < cnt; b += stride)
-                    {
-                        int j = bucket[b];
-                        Vector2 d = _positions[j] - p;
-                        float dsq = d.sqrMagnitude;
-                        if (dsq > r2)
-                            continue;
-
-                        Vector2 vj = _velocities[j];
-                        if (vj.sqrMagnitude < 1e-8f)
-                            continue;
-
-                        if (fill < maxK)
-                        {
-                            buf[fill++] = new Candidate { DistSq = dsq, Index = j };
-                        }
-                        else
-                        {
-                            int w = IndexOfLargestDistSq(buf, maxK);
-                            if (dsq < buf[w].DistSq)
-                                buf[w] = new Candidate { DistSq = dsq, Index = j };
-                        }
-                    }
-                }
-            }
-
-            if (fill == 0)
-                return;
-
-            Vector2 sum = Vector2.zero;
-            for (int c = 0; c < fill; c++)
-            {
-                int j = buf[c].Index;
-                sum += _velocities[j].normalized;
-            }
-
-            Vector2 avg = sum / fill;
-            if (avg.sqrMagnitude < 1e-8f)
-                return;
-
-            float theta = Mathf.Atan2(avg.y, avg.x);
-            float sigmaDeg = gameConfig.angularNoiseDegrees;
-            float noiseDeg = sigmaDeg > 0f ? SampleGaussianStandard() * sigmaDeg : 0f;
-            theta += noiseDeg * Mathf.Deg2Rad;
-            _velocities[agentIndex] = _cruiseSpeeds[agentIndex] * new Vector2(Mathf.Cos(theta), Mathf.Sin(theta));
-        }
-
-        void ApplyBoundarySteering(int i)
-        {
-            Vector2 center = gameConfig.spawnCircleCenter;
-            float R = gameConfig.boundingDomainRadius;
-            float band = Mathf.Min(gameConfig.boundingRepulsionBandWidth, R - 1e-4f);
-            Vector2 p = _positions[i];
-            Vector2 offset = p - center;
-            float dist = offset.magnitude;
-            float inner = R - band;
-            if (dist <= inner || dist < 1e-6f)
-                return;
-
-            Vector2 toCenter = -offset / dist;
-            float w = Mathf.Clamp01((dist - inner) / band);
-            w = w * w * (3f - 2f * w);
-
-            Vector2 vel = _velocities[i];
-            Vector2 vicsekDir = vel.sqrMagnitude > 1e-8f ? vel.normalized : toCenter;
-            Vector2 dir = Vector2.Lerp(vicsekDir, toCenter, w).normalized;
-            _velocities[i] = dir * _cruiseSpeeds[i];
-        }
-
-        void ClampAgentPosition(int i)
-        {
-            Vector2 center = gameConfig.spawnCircleCenter;
-            float R = gameConfig.boundingDomainRadius;
-            const float eps = 1e-3f;
-            Vector2 p = _positions[i];
-            Vector2 offset = p - center;
-            float dist = offset.magnitude;
-            if (dist <= R - eps || dist < 1e-6f)
-                return;
-
-            float scale = (R - eps) / dist;
-            _positions[i] = new Vector2(
-                center.x + offset.x * scale,
-                center.y + offset.y * scale);
         }
     }
 }
