@@ -13,3 +13,4 @@ Camera - The game scene should be controllable with standard camera movements fo
 
 Organization - All constants used in the game (such as acceleration rates, mass, positions, and sizes) are stored in a GameConfig script and other scripts load their constants from GameConfig.
 All keyboard keys are defined in a KeyboardConfig file which specifies which key performs which action in the game.
+Prefer virtual hooks on base types when possible so that class scripts do not need to name other concrete types unless a design explicitly calls for it.

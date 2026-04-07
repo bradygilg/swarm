@@ -81,8 +81,10 @@ namespace Swarm
                     continue;
                 if (!o.IsActiveInSimulation)
                     continue;
-                if (o.GetComponent<Prey>() == null)
+                if (!o.Eatable)
                     continue;
+                // if (o.GetComponent<Prey>() == null)
+                //     continue;
 
                 s_RadiusBuffer[n++] = o;
             }
@@ -90,17 +92,39 @@ namespace Swarm
             if (n == 0)
                 return;
 
-            Organism victim = s_RadiusBuffer[Random.Range(0, n)];
-            Prey preyComp = victim.GetComponent<Prey>();
-            if (preyComp == null)
-                return;
+            float totalWeight = 0f;
+            for (int i = 0; i < n; i++)
+                totalWeight += VictimSelectionWeight(s_RadiusBuffer[i]);
+
+            float pick = Random.Range(0f, totalWeight);
+            Organism victim = s_RadiusBuffer[n - 1];
+            for (int i = 0; i < n; i++)
+            {
+                pick -= VictimSelectionWeight(s_RadiusBuffer[i]);
+                if (pick < 0f)
+                {
+                    victim = s_RadiusBuffer[i];
+                    break;
+                }
+            }
+            // Prey preyComp = victim.GetComponent<Prey>();
+            // if (preyComp == null)
+            //     return;
 
             transform.localScale += _additiveScalePerEat;
 
-            preyComp.NotifyEaten();
+            victim.NotifyEaten();
 
             if (transform.localScale.x >= _originalUniformScale * 2f - 1e-4f)
                 SplitIntoTwoPredators();
+        }
+
+        /// <summary>Prey and other non-predators are 3× as likely to be chosen as another <see cref="Predator"/>.</summary>
+        static float VictimSelectionWeight(Organism o)
+        {
+            if (o == null)
+                return 0f;
+            return o.GetComponent<Predator>() != null ? 1f : 3f;
         }
 
         void SplitIntoTwoPredators()

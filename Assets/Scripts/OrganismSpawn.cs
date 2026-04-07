@@ -26,7 +26,10 @@ namespace Swarm
             GameObject go = Object.Instantiate(prefab.gameObject);
             var org = go.GetComponent<Organism>();
             Vector2 p = source.SimulationPosition + positionOffset;
-            org.Initialize(cfg, p, source.SimulationVelocity, source.CruiseSpeed);
+            if (org is Flower flower)
+                flower.Setup(cfg, p);
+            else
+                org.Initialize(cfg, p, source.SimulationVelocity, source.CruiseSpeed);
             if (addPredator)
                 go.AddComponent<Predator>();
             if (addPrey)
@@ -44,6 +47,8 @@ namespace Swarm
                     return Resources.Load<CircleOrganism>(CircleOrganismPrefabResource);
                 case StarOrganism _:
                     return Resources.Load<StarOrganism>(StarOrganismPrefabResource);
+                case Flower _:
+                    return Resources.Load<Flower>("Flower");
                 default:
                     return Resources.Load<Organism>(DefaultOrganismPrefabResource);
             }

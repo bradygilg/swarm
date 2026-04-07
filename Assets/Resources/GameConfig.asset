@@ -12,24 +12,47 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f4e8b2a1793c4d5e6f708192a3b4c5d6, type: 3}
   m_Name: GameConfig
   m_EditorClassIdentifier: Assembly-CSharp::Swarm.GameConfig
-  organismCount: 200
+  organismCount: 2000
   spawnCircleCenter: {x: 0, y: 0}
-  spawnCircleRadius: 4
-  organismSpeedMin: 2
-  organismSpeedMax: 3
+  spawnCircleRadius: 5
+  organismSpeedMin: 0.5
+  organismSpeedMax: 2
+  spawnFractionSquare: 0
+  spawnFractionCircle: 0.05
+  spawnFractionStar: 0.01
+  spawnFractionPredator: 0.048
+  predatorEatIntervalSeconds: 5
+  predatorHuntRadius: 2
+  predatorGrowthPercentOnEat: 10
+  preyFadeDurationSeconds: 1
+  circleCruiseSpeedLowDensity: 1
+  circleCruiseSpeedHighDensity: 3.5
   neighborRadius: 1.5
-  angularNoiseDegrees: 12
-  vicsekMaxNeighbors: 32
-  vicsekStagger: 1
+  angularNoiseDegrees: 8
+  vicsekMaxNeighbors: 10
+  vicsekStagger: 3
   vicsekSpatialSubdivisions: 2
-  vicsekMaxBucketSamples: 64
-  boundingDomainRadius: 100
-  boundingRepulsionBandWidth: 15
+  vicsekMaxBucketSamples: 16
+  flowerVicsekWeight: 5
+  flowerInitialNectar: 100
+  flowerSpawnIntervalSeconds: 10
+  flowerSpriteResolution: 32
+  flowerMinVisualScale: 0.1
+  flowerMaxVisualScale: 0.35
+  preyFlowerGatherRadius: 2
+  preyNectarConsumptionPerSecond: 1
+  preyReplicationNectarThreshold: 10
+  preyNectarScaleAdditivePercent: 10
+  boundingDomainRadius: 20
+  boundingRepulsionBandWidth: 2
   spatialGridBucketCapacity: 16
   triangleScale: 0.35
   triangleSpriteResolution: 32
   organismColorAtMinSpeed: {r: 0.25, g: 0.55, b: 1, a: 1}
   organismColorAtMaxSpeed: {r: 1, g: 0.4, b: 0.15, a: 1}
+  showSpatialGridInGame: 0
+  spatialGridLineColor: {r: 0.45, g: 0.9, b: 1, a: 0.85}
+  spatialGridSortingOrder: -400
   organismMass: 1
   cameraKeyboardPanSpeed: 10
   cameraMousePanButtons: 0100000002000000

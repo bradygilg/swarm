@@ -87,6 +87,27 @@ namespace Swarm
                 else
                     instance.gameObject.AddComponent<Prey>();
             }
+
+            SpawnPlayerOrganism(gameConfig, organismPrefab);
+        }
+
+        static void SpawnPlayerOrganism(GameConfig gameConfig, Organism organismPrefab)
+        {
+            if (gameConfig == null || organismPrefab == null)
+                return;
+
+            float theta = Random.Range(0f, Mathf.PI * 2f);
+            float radius = gameConfig.spawnCircleRadius * Mathf.Sqrt(Random.value);
+            Vector2 pos = gameConfig.spawnCircleCenter + radius * new Vector2(Mathf.Cos(theta), Mathf.Sin(theta));
+            float heading = Random.Range(0f, Mathf.PI * 2f);
+            float vmin = Mathf.Min(gameConfig.organismSpeedMin, gameConfig.organismSpeedMax);
+            float vmax = Mathf.Max(gameConfig.organismSpeedMin, gameConfig.organismSpeedMax);
+            float cruiseSpeed = Random.Range(vmin, vmax);
+
+            Organism player = Object.Instantiate(organismPrefab);
+            player.Initialize(gameConfig, pos, heading, cruiseSpeed);
+            player.transform.localScale *= 5f;
+            player.gameObject.AddComponent<PlayerControlled>();
         }
     }
 }

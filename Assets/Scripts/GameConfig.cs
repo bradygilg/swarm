@@ -42,12 +42,6 @@ namespace Swarm
         [Tooltip("Seconds to fade prey sprite alpha to zero before destroy.")]
         [Min(0.01f)] public float preyFadeDurationSeconds = 1f;
 
-        [Tooltip("Seconds between independent replication rolls for each Prey.")]
-        [Min(0.1f)] public float preyReplicateIntervalSeconds = 10f;
-
-        [Tooltip("Chance (0–1) each interval that a Prey spawns one duplicate of itself.")]
-        [Range(0f, 1f)] public float preyReplicateChance = 0.2f;
-
         [Header("Circle organism")]
         [Tooltip("Cruise speed when few neighbors are in the Vicsek K-set (fill → 0).")]
         [Min(0.01f)] public float circleCruiseSpeedLowDensity = 1f;
@@ -72,6 +66,36 @@ namespace Swarm
         [Tooltip("Max indices visited per spatial bucket when gathering Vicsek candidates; 0 = scan entire bucket. Uses striding when bucket is larger (approximate).")]
         [Min(0)] public int vicsekMaxBucketSamples = 16;
 
+        [Tooltip("Vicsek weight when the receiving agent has Prey and the neighbor is a Flower (other neighbors use weight 1).")]
+        [Min(0.01f)] public float flowerVicsekWeight = 5f;
+
+        [Header("Flower / nectar")]
+        [Tooltip("Starting nectar per spawned flower.")]
+        [Min(0)] public int flowerInitialNectar = 100;
+
+        [Tooltip("Seconds between random flower spawns inside the bounding disk.")]
+        [Min(0.1f)] public float flowerSpawnIntervalSeconds = 10f;
+
+        [Min(8)] public int flowerSpriteResolution = 32;
+
+        [Tooltip("World scale when nectar is depleted.")]
+        [Min(0.01f)] public float flowerMinVisualScale = 0.1f;
+
+        [Tooltip("World scale when nectar is full (initial).")]
+        [Min(0.01f)] public float flowerMaxVisualScale = 0.35f;
+
+        [Tooltip("Gather radius for prey feeding on flowers.")]
+        [Min(0.01f)] public float preyFlowerGatherRadius = 2f;
+
+        [Tooltip("Nectar units removed per second while a prey is in gather range of a flower with nectar.")]
+        [Min(0f)] public float preyNectarConsumptionPerSecond = 1f;
+
+        [Tooltip("Nectar units consumed before prey replicates.")]
+        [Min(1)] public int preyReplicationNectarThreshold = 10;
+
+        [Tooltip("Additive visual scale per nectar unit consumed, as percent of base prey scale.")]
+        [Min(0f)] public float preyNectarScaleAdditivePercent = 10f;
+
         [Header("Bounding domain")]
         [Tooltip("World radius from spawnCircleCenter to the circular wall.")]
         [Min(0.01f)] public float boundingDomainRadius = 20f;
@@ -92,6 +116,15 @@ namespace Swarm
 
         [Tooltip("Triangle tint at organismSpeedMax.")]
         public Color organismColorAtMaxSpeed = new Color(1f, 0.4f, 0.15f, 1f);
+
+        [Tooltip("When true, draws world lines for the CPU Vicsek spatial hash: cell size = neighborRadius / vicsekSpatialSubdivisions, aligned to world axes (same as SwarmSimulation._spatialGrid).")]
+        public bool showSpatialGridInGame;
+
+        [Tooltip("Color for spatial grid lines (alpha controls visibility).")]
+        public Color spatialGridLineColor = new Color(0.45f, 0.9f, 1f, 0.4f);
+
+        [Tooltip("Draw order relative to other 2D renderers (above checkerboard, below organisms).")]
+        public int spatialGridSortingOrder = -400;
 
         [Header("Physics (optional tuning)")]
         [Min(0.01f)] public float organismMass = 1f;
