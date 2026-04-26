@@ -20,8 +20,9 @@ namespace Swarm
                 return;
 
             GameConfig cfg = sim.Config;
+            OrganismTypeConfig typeCfg = cfg.OrganismTypeConfig;
             float densityT = maxK > 0 ? fill / (float)maxK : 0f;
-            float speed = Mathf.Lerp(cfg.circleCruiseSpeedLowDensity, cfg.circleCruiseSpeedHighDensity, densityT);
+            float speed = Mathf.Lerp(typeCfg.circleCruiseSpeedLowDensity, typeCfg.circleCruiseSpeedHighDensity, densityT);
             SetCruiseSpeed(speed);
 
             theta += ApplyAngularNoiseRadians(cfg);

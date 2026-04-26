@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace Swarm
 {
-    /// <summary>Spawns organisms from Resources prefabs (same strategy as <see cref="OrganismFactory"/>), without cloning runtime Predator/Prey state.</summary>
+    /// <summary>Spawns organisms from Resources prefabs (same strategy as <see cref="OrganismFactory"/>).</summary>
     public static class OrganismSpawn
     {
         const string DefaultOrganismPrefabResource = "Organism";
@@ -10,8 +10,8 @@ namespace Swarm
         const string CircleOrganismPrefabResource = "CircleOrganism";
         const string StarOrganismPrefabResource = "StarOrganism";
 
-        /// <summary>Instantiates the same concrete organism type as <paramref name="source"/>, initializes it, then optionally adds Predator and/or Prey.</summary>
-        public static Organism SpawnSameOrganismType(Organism source, GameConfig cfg, Vector2 positionOffset, bool addPredator, bool addPrey)
+        /// <summary>Instantiates the same concrete organism base type as <paramref name="source"/> and initializes simulation state.</summary>
+        public static Organism SpawnBaseCloneFromSource(Organism source, GameConfig cfg, Vector2 positionOffset)
         {
             if (source == null || cfg == null)
                 return null;
@@ -30,10 +30,6 @@ namespace Swarm
                 flower.Setup(cfg, p);
             else
                 org.Initialize(cfg, p, source.SimulationVelocity, source.CruiseSpeed);
-            if (addPredator)
-                go.AddComponent<Predator>();
-            if (addPrey)
-                go.AddComponent<Prey>();
             return org;
         }
 

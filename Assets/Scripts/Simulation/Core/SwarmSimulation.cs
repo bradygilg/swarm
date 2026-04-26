@@ -37,6 +37,7 @@ namespace Swarm
         public GameConfig Config => gameConfig;
 
         readonly List<Organism> _organisms = new List<Organism>();
+        public IReadOnlyList<Organism> RegisteredOrganisms => _organisms;
 
         /// <summary>Active <see cref="Flower"/> instances; maintained for O(flowers) radius queries (prey nectar).</summary>
         readonly List<Flower> _flowers = new List<Flower>();

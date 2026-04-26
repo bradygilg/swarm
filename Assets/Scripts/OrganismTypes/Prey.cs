@@ -23,7 +23,7 @@ namespace Swarm
 
         /// <summary>Vicsek weight this prey applies to <see cref="Flower"/> neighbors (called from <see cref="Flower.GetVicsekWeightForReceiver"/>).</summary>
         public float GetVicsekWeightForFlowerNeighbor(SwarmSimulation sim) =>
-            sim != null && sim.Config != null ? sim.Config.flowerVicsekWeight : 1f;
+            sim != null && sim.Config != null ? sim.Config.OrganismTypeConfig.flowerVicsekWeight : 1f;
 
         void FixedUpdate()
         {
@@ -96,7 +96,7 @@ namespace Swarm
         {
             float r = Mathf.Max(0.05f, transform.localScale.x * 0.2f);
             Vector2 offset = Random.insideUnitCircle * r;
-            OrganismSpawn.SpawnSameOrganismType(_organism, cfg, offset, false, true);
+            _organism.SpawnClone(cfg, offset);
             transform.localScale = Vector3.one * _baseVisualScale;
         }
     }

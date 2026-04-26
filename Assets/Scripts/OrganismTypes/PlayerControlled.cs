@@ -51,8 +51,8 @@ namespace Swarm
             Vector2 toMouse = target - _organism.SimulationPosition;
             float dist = toMouse.magnitude;
 
-            float vmin = Mathf.Min(cfg.organismSpeedMin, cfg.organismSpeedMax);
-            float vmax = Mathf.Max(cfg.organismSpeedMin, cfg.organismSpeedMax);
+            float vmin = Mathf.Min(cfg.playerSpeedMin, cfg.playerSpeedMax);
+            float vmax = Mathf.Max(cfg.playerSpeedMin, cfg.playerSpeedMax);
             float maxDist = Mathf.Max(1e-4f, cfg.boundingDomainRadius);
 
             if (toMouse.sqrMagnitude > 1e-8f)
@@ -61,12 +61,12 @@ namespace Swarm
                 float speed = Mathf.Lerp(vmin, vmax, t);
                 _organism.SetCruiseSpeed(speed);
                 _organism.SetVelocity(toMouse.normalized * speed);
-                _organism.ApplyVisualColorForSpeed(cfg, speed);
+                _organism.ApplyVisualColorForSpeedRange(cfg, speed, vmin, vmax);
             }
             else
             {
                 _organism.SetVelocity(Vector2.zero);
-                _organism.ApplyVisualColorForSpeed(cfg, 0f);
+                _organism.ApplyVisualColorForSpeedRange(cfg, 0f, vmin, vmax);
             }
         }
 

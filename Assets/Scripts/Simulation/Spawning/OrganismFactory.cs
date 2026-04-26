@@ -86,6 +86,9 @@ namespace Swarm
                     instance.gameObject.AddComponent<Predator>();
                 else
                     instance.gameObject.AddComponent<Prey>();
+
+                if (Random.value < Mathf.Clamp01(gameConfig.spawnFractionNpcTrailingWall))
+                    instance.gameObject.AddComponent<TrailingWall>();
             }
 
             SpawnPlayerOrganism(gameConfig, organismPrefab);
@@ -108,6 +111,8 @@ namespace Swarm
             player.Initialize(gameConfig, pos, heading, cruiseSpeed);
             player.transform.localScale *= 5f;
             player.gameObject.AddComponent<PlayerControlled>();
+            player.gameObject.AddComponent<PlayerProjectileShooter>();
+            player.gameObject.AddComponent<TrailingWall>();
         }
     }
 }

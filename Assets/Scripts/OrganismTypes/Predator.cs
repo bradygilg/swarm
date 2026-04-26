@@ -50,9 +50,10 @@ namespace Swarm
                 return;
             }
 
-            _eatIntervalSeconds = Mathf.Max(1e-4f, cfg.predatorEatIntervalSeconds);
-            _huntRadius = Mathf.Max(1e-4f, cfg.predatorHuntRadius);
-            _growthPercentOnEat = cfg.predatorGrowthPercentOnEat;
+            OrganismTypeConfig typeCfg = cfg.OrganismTypeConfig;
+            _eatIntervalSeconds = Mathf.Max(1e-4f, typeCfg.predatorEatIntervalSeconds);
+            _huntRadius = Mathf.Max(1e-4f, typeCfg.predatorHuntRadius);
+            _growthPercentOnEat = typeCfg.predatorGrowthPercentOnEat;
         }
 
         void FixedUpdate()
@@ -141,8 +142,7 @@ namespace Swarm
                 sep = Vector2.right;
             sep = sep.normalized * Mathf.Max(0.05f, _originalUniformScale * 0.25f);
 
-            OrganismSpawn.SpawnSameOrganismType(_organism, cfg, sep, true, false);
-            OrganismSpawn.SpawnSameOrganismType(_organism, cfg, -sep, true, false);
+            _organism.SplitIntoTwoClones(cfg, sep, out _, out _);
             Destroy(gameObject);
         }
     }

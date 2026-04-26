@@ -3,11 +3,41 @@ using UnityEngine;
 
 namespace Swarm
 {
+    public enum TrailingWallQualityPreset
+    {
+        Low,
+        Medium,
+        High,
+        Custom
+    }
+
+    public enum PlayerProjectileFireInput
+    {
+        LeftMouse = 0,
+        RightMouse = 1,
+        MiddleMouse = 2
+    }
+
     [CreateAssetMenu(fileName = "GameConfig", menuName = "Swarm/Game Config", order = 0)]
     public sealed class GameConfig : ScriptableObject
     {
+        const string DefaultOrganismTypeConfigResource = "OrganismTypeConfig";
+        [SerializeField] OrganismTypeConfig organismTypeConfig;
+
+        public OrganismTypeConfig OrganismTypeConfig
+        {
+            get
+            {
+                if (organismTypeConfig == null)
+                    organismTypeConfig = Resources.Load<OrganismTypeConfig>(DefaultOrganismTypeConfigResource);
+                if (organismTypeConfig == null)
+                    organismTypeConfig = ScriptableObject.CreateInstance<OrganismTypeConfig>();
+                return organismTypeConfig;
+            }
+        }
+
         [Header("Spawn")]
-        [Min(1)] public int organismCount = 2000;
+        [Min(1)] public int organismCount = 20;
         public Vector2 spawnCircleCenter = Vector2.zero;
         [Min(0.01f)] public float spawnCircleRadius = 5f;
 
@@ -17,37 +47,26 @@ namespace Swarm
 
         [Min(0.01f)] public float organismSpeedMax = 2f;
 
+        [Tooltip("Player-controlled speed floor used by PlayerControlled (separate from NPC organism speeds).")]
+        [Min(0.01f)] public float playerSpeedMin = 0.5f;
+
+        [Tooltip("Player-controlled speed cap used by PlayerControlled (separate from NPC organism speeds).")]
+        [Min(0.01f)] public float playerSpeedMax = 2f;
+
         [Tooltip("Fraction of spawns that use SquareOrganism (anti-alignment).")]
-        [Range(0f, 1f)] public float spawnFractionSquare = 0.05f;
+        [Range(0f, 1f)] public float spawnFractionSquare = 0f;
 
         [Tooltip("Fraction of spawns that use CircleOrganism (density-based speed).")]
         [Range(0f, 1f)] public float spawnFractionCircle = 0.05f;
 
         [Tooltip("Fraction of spawns that use StarOrganism (others flee its position in Vicsek mean).")]
-        [Range(0f, 1f)] public float spawnFractionStar = 0.01f;
+        [Range(0f, 1f)] public float spawnFractionStar = 0f;
 
         [Tooltip("Fraction of spawns that receive a Predator component; remainder receive Prey.")]
         [Range(0f, 1f)] public float spawnFractionPredator = 0.01f;
 
-        [Header("Predator / Prey")]
-        [Tooltip("Seconds between eat attempts (X).")]
-        [Min(1e-4f)] public float predatorEatIntervalSeconds = 5f;
-
-        [Tooltip("World radius to find prey (Y).")]
-        [Min(1e-4f)] public float predatorHuntRadius = 1f;
-
-        [Tooltip("Scale multiplier increase per eat as percent (Z), e.g. 10 = +10% size.")]
-        public float predatorGrowthPercentOnEat = 10f;
-
-        [Tooltip("Seconds to fade prey sprite alpha to zero before destroy.")]
-        [Min(0.01f)] public float preyFadeDurationSeconds = 1f;
-
-        [Header("Circle organism")]
-        [Tooltip("Cruise speed when few neighbors are in the Vicsek K-set (fill → 0).")]
-        [Min(0.01f)] public float circleCruiseSpeedLowDensity = 1f;
-
-        [Tooltip("Cruise speed when the K-set is full (fill → vicsekMaxNeighbors).")]
-        [Min(0.01f)] public float circleCruiseSpeedHighDensity = 3.5f;
+        [Tooltip("Fraction of NPC spawns that receive the TrailingWall component.")]
+        [Range(0f, 1f)] public float spawnFractionNpcTrailingWall = 0.05f;
 
         [Header("Vicsek")]
         [Min(0.01f)] public float neighborRadius = 1.5f;
@@ -65,9 +84,6 @@ namespace Swarm
 
         [Tooltip("Max indices visited per spatial bucket when gathering Vicsek candidates; 0 = scan entire bucket. Uses striding when bucket is larger (approximate).")]
         [Min(0)] public int vicsekMaxBucketSamples = 16;
-
-        [Tooltip("Vicsek weight when the receiving agent has Prey and the neighbor is a Flower (other neighbors use weight 1).")]
-        [Min(0.01f)] public float flowerVicsekWeight = 5f;
 
         [Header("Flower / nectar")]
         [Tooltip("Starting nectar per spawned flower.")]
@@ -103,6 +119,14 @@ namespace Swarm
         [Tooltip("Distance inside the wall where inward steering ramps from Vicsek to full inward.")]
         [Min(0.01f)] public float boundingRepulsionBandWidth = 2f;
 
+        [Header("Trailing wall")]
+        [Tooltip("Global performance/quality preset for TrailingWall behavior. Custom uses the explicit values below.")]
+        public TrailingWallQualityPreset trailingWallQualityPreset = TrailingWallQualityPreset.Medium;
+
+        [Header("Player projectile")]
+        [Tooltip("Mouse button used to fire player projectiles.")]
+        public PlayerProjectileFireInput playerProjectileFireInput = PlayerProjectileFireInput.LeftMouse;
+
         [Header("Initializations")]
         [Tooltip("Initial capacity for each spatial-grid bucket (per cell) when finding Vicsek neighbors; avoids extra List growth.")]
         [Min(1)] public int spatialGridBucketCapacity = 16;
@@ -124,7 +148,7 @@ namespace Swarm
         public Color spatialGridLineColor = new Color(0.45f, 0.9f, 1f, 0.4f);
 
         [Tooltip("Draw order relative to other 2D renderers (above checkerboard, below organisms).")]
-        public int spatialGridSortingOrder = -400;
+        public int spatialGridSortingOrder = 400;
 
         [Header("Physics (optional tuning)")]
         [Min(0.01f)] public float organismMass = 1f;

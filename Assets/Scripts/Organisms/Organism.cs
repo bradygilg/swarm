@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using UnityEngine;
 
 namespace Swarm
@@ -100,7 +101,7 @@ namespace Swarm
 
             float duration = 1f;
             if (SwarmSimulation.Instance != null && SwarmSimulation.Instance.Config != null)
-                duration = Mathf.Max(0.01f, SwarmSimulation.Instance.Config.preyFadeDurationSeconds);
+                duration = Mathf.Max(0.01f, SwarmSimulation.Instance.Config.OrganismTypeConfig.preyFadeDurationSeconds);
 
             StartCoroutine(FadeOutAndDestroy(duration));
         }
@@ -137,12 +138,106 @@ namespace Swarm
         /// <summary>Preferred speed magnitude used by boundary blending and base Vicsek.</summary>
         public void SetCruiseSpeed(float cruiseSpeed) => _cruiseSpeed = Mathf.Max(1e-4f, cruiseSpeed);
 
+        /// <summary>Spawns one clone from this organism's concrete base type and copies serialized component state from parent.</summary>
+        public Organism SpawnClone(GameConfig config, Vector2 positionOffset)
+        {
+            if (config == null)
+                return null;
+
+            Organism clone = OrganismSpawn.SpawnBaseCloneFromSource(this, config, positionOffset);
+            if (clone == null)
+                return null;
+
+            CopySerializedComponentStateTo(clone);
+            return clone;
+        }
+
+        /// <summary>
+        /// Spawns two clones at +/- <paramref name="offset"/>, copies serialized component state from parent to both,
+        /// and applies split-size normalization (each child gets half the parent's current scale).
+        /// </summary>
+        public bool SplitIntoTwoClones(GameConfig config, Vector2 offset, out Organism cloneA, out Organism cloneB)
+        {
+            cloneA = null;
+            cloneB = null;
+            if (config == null)
+                return false;
+
+            cloneA = SpawnClone(config, offset);
+            cloneB = SpawnClone(config, -offset);
+            bool ok = cloneA != null && cloneB != null;
+            if (!ok)
+                return false;
+
+            Vector3 splitScale = transform.localScale * 0.5f;
+            cloneA.transform.localScale = splitScale;
+            cloneB.transform.localScale = splitScale;
+            return true;
+        }
+
+        void CopySerializedComponentStateTo(Organism clone)
+        {
+            if (clone == null)
+                return;
+
+            Component[] parentComponents = GetComponents<Component>();
+            for (int i = 0; i < parentComponents.Length; i++)
+            {
+                Component parent = parentComponents[i];
+                if (parent == null)
+                    continue;
+
+                System.Type type = parent.GetType();
+                if (type == typeof(Transform))
+                    continue;
+                if (typeof(Organism).IsAssignableFrom(type))
+                    continue;
+
+                Component child = clone.GetComponent(type);
+                if (child == null)
+                    child = clone.gameObject.AddComponent(type);
+                if (child == null)
+                    continue;
+
+                CopySerializedFields(parent, child, type);
+            }
+        }
+
+        static void CopySerializedFields(object source, object destination, System.Type runtimeType)
+        {
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
+            for (System.Type t = runtimeType; t != null && t != typeof(object); t = t.BaseType)
+            {
+                FieldInfo[] fields = t.GetFields(flags);
+                for (int i = 0; i < fields.Length; i++)
+                {
+                    FieldInfo f = fields[i];
+                    if (f.IsStatic || f.IsLiteral || f.IsInitOnly || f.IsNotSerialized)
+                        continue;
+
+                    bool serialized = f.IsPublic || f.GetCustomAttribute<SerializeField>() != null;
+                    if (!serialized)
+                        continue;
+
+                    f.SetValue(destination, f.GetValue(source));
+                }
+            }
+        }
+
         /// <summary>Sets sprite tint from <paramref name="speedForColorMap"/> using the same min/max speed color ramp as other organisms.</summary>
         public void ApplyVisualColorForSpeed(GameConfig config, float speedForColorMap)
         {
             if (config == null || _spriteRenderer == null)
                 return;
             _spriteRenderer.color = ColorForCruiseSpeed(config, speedForColorMap);
+        }
+
+        /// <summary>Sets sprite tint from <paramref name="speedForColorMap"/> using an explicit [<paramref name="minSpeed"/>, <paramref name="maxSpeed"/>] range.</summary>
+        public void ApplyVisualColorForSpeedRange(GameConfig config, float speedForColorMap, float minSpeed, float maxSpeed)
+        {
+            if (config == null || _spriteRenderer == null)
+                return;
+            _spriteRenderer.color = ColorForSpeedRange(config, speedForColorMap, minSpeed, maxSpeed);
         }
 
         /// <summary>Whether <paramref name="other"/> may appear in K-nearest gather for this agent.</summary>
@@ -311,7 +406,14 @@ namespace Swarm
         {
             float vmin = Mathf.Min(config.organismSpeedMin, config.organismSpeedMax);
             float vmax = Mathf.Max(config.organismSpeedMin, config.organismSpeedMax);
-            float t = vmax > vmin ? Mathf.Clamp01((cruiseSpeed - vmin) / (vmax - vmin)) : 0.5f;
+            return ColorForSpeedRange(config, cruiseSpeed, vmin, vmax);
+        }
+
+        static Color ColorForSpeedRange(GameConfig config, float speed, float minSpeed, float maxSpeed)
+        {
+            float vmin = Mathf.Min(minSpeed, maxSpeed);
+            float vmax = Mathf.Max(minSpeed, maxSpeed);
+            float t = vmax > vmin ? Mathf.Clamp01((speed - vmin) / (vmax - vmin)) : 0.5f;
             return Color.Lerp(config.organismColorAtMinSpeed, config.organismColorAtMaxSpeed, t);
         }
 
